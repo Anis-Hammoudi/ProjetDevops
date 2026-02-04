@@ -1,26 +1,30 @@
 ---
-# Main playbook for deploying GLPI stack on Docker Swarm
+# =============================================================================
+# PLAYBOOK PRINCIPAL - Deploiement GLPI sur Docker Swarm
+# =============================================================================
+# Execute via WSL : ansible-playbook playbooks/site.yml
+# =============================================================================
 
-- name: Configure all nodes
+- name: Configuration commune et installation Docker
   hosts: swarm
   become: true
   roles:
     - common
     - docker
 
-- name: Initialize Swarm Manager
+- name: Initialisation du Swarm Manager
   hosts: managers
   become: true
   roles:
     - swarm-manager
 
-- name: Join Swarm Workers
+- name: Jonction des Workers au Swarm
   hosts: workers
   become: true
   roles:
     - swarm-worker
 
-- name: Deploy application stack
+- name: Deploiement de la stack GLPI
   hosts: managers
   become: true
   roles:

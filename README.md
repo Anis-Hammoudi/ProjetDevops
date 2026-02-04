@@ -12,13 +12,14 @@
 
 Déployer automatiquement une infrastructure Docker Swarm avec :
 - **3 Nginx** en reverse proxy (Docker Swarm avec réplication)
-- **Let's Encrypt** pour les certificats SSL (auto-signé en local)
+- **Certificats SSL** auto-signés (environnement local)
 - **GLPI** comme serveur web de gestion IT
 - **MariaDB** comme base de données
 
 **Outils utilisés :**
-- **Terraform/Vagrant** : Provisionnement de l'infrastructure (3 VMs)
-- **Ansible** : Configuration des serveurs (rôles Docker, Swarm, Stack)
+- **Terraform** : Orchestration du provisionnement via Vagrant
+- **Vagrant/VirtualBox** : Création des VMs (3 nœuds)
+- **Ansible** : Configuration des serveurs via SSH depuis WSL
 
 ---
 
@@ -36,10 +37,12 @@ Déployer automatiquement une infrastructure Docker Swarm avec :
 │    MANAGER    │              │   WORKER 1    │              │   WORKER 2    │
 │ 192.168.56.10 │              │ 192.168.56.11 │              │ 192.168.56.12 │
 ├───────────────┤              ├───────────────┤              ├───────────────┤
-│  • MariaDB    │              │  • Nginx 1/3  │              │  • Nginx 1/3  │
-│  • GLPI       │              │               │              │               │
-│  • Nginx 1/3  │              │               │              │               │
+│  • MariaDB    │              │  • Nginx      │              │  • Nginx      │
+│  • GLPI       │              │    (replica)  │              │    (replica)  │
+│  • Nginx      │              │               │              │               │
 └───────────────┘              └───────────────┘              └───────────────┘
+
+            Réseau overlay : glpi_glpi_net (Docker Swarm)
 ```
 
 ### Services déployés
@@ -47,8 +50,8 @@ Déployer automatiquement une infrastructure Docker Swarm avec :
 | Service | Image | Replicas | Port | Description |
 |---------|-------|----------|------|-------------|
 | nginx | nginx:alpine | 3 | 80, 443 | Reverse proxy avec SSL/TLS |
-| glpi | diouxx/glpi:latest | 1 | - | Application GLPI |
-| mariadb | mariadb:10.6 | 1 | - | Base de données |
+| glpi | diouxx/glpi:latest | 1 | 8080 | Application GLPI |
+| mariadb | mariadb:10.6 | 1 | 3306 | Base de données |
 
 ---
 
@@ -56,83 +59,23 @@ Déployer automatiquement une infrastructure Docker Swarm avec :
 
 | Logiciel | Version | Téléchargement |
 |----------|---------|----------------|
-| VirtualBox | >= 6.1 | https://www.virtualbox.org/wiki/Downloads |
-| Vagrant | >= 2.3 | https://www.vagrantup.com/downloads |
+| VirtualBox | >= 7.0 | https://www.virtualbox.org/wiki/Downloads |
+| Vagrant | >= 2.4 | https://www.vagrantup.com/downloads |
+| Terraform | >= 1.0 | https://www.terraform.io/downloads |
+| WSL (Ubuntu) | 2 | `wsl --install -d Ubuntu` |
 
 ### Installation Windows (PowerShell)
 
 ```powershell
-# Avec Scoop
-scoop install vagrant
+# Installer WSL avec Ubuntu
+wsl --install -d Ubuntu
 
-# Ou avec Chocolatey
-choco install vagrant virtualbox -y
+# Installer Ansible dans WSL
+wsl -d Ubuntu -e bash -c "sudo apt update && sudo apt install -y ansible"
+
+# Installer Vagrant et VirtualBox (avec Chocolatey)
+choco install vagrant virtualbox terraform -y
 ```
-
----
-
-## Déploiement automatique
-
-### Méthode 1 : Script batch (recommandé)
-
-```cmd
-deploy.bat
-```
-
-Ce script :
-1. Détruit les anciennes VMs
-2. Crée 3 VMs avec Vagrant/VirtualBox
-3. Installe Docker sur chaque nœud
-4. Initialise le cluster Docker Swarm
-5. Déploie la stack GLPI
-
-### Méthode 2 : Commandes manuelles
-
-```powershell
-# Étape 1 : Provisionnement infrastructure (Terraform/Vagrant)
-cd terraform
-vagrant up
-
-# Étape 2 : Déploiement stack (Ansible équivalent)
-vagrant ssh manager -c "sudo mkdir -p /opt/glpi && sudo cp /vagrant/stack/* /opt/glpi/ && sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /opt/glpi/privkey.pem -out /opt/glpi/fullchain.pem -subj '/CN=glpi.local' 2>/dev/null && sudo docker stack deploy -c /opt/glpi/docker-compose.yml glpi"
-```
-
----
-
-## Vérification
-
-```powershell
-# Voir les nœuds du cluster Swarm
-vagrant ssh manager -c "docker node ls"
-
-# Voir les services déployés
-vagrant ssh manager -c "docker service ls"
-
-# Résultat attendu :
-# NAME           REPLICAS   IMAGE
-# glpi_nginx     3/3        nginx:alpine
-# glpi_glpi      1/1        diouxx/glpi:latest
-# glpi_mariadb   1/1        mariadb:10.6
-```
-
----
-
-## Accès à l'application
-
-| Paramètre | Valeur |
-|-----------|--------|
-| URL | https://192.168.56.10 |
-| Login GLPI | glpi |
-| Password GLPI | glpi |
-
-### Configuration base de données (premier lancement)
-
-| Paramètre | Valeur |
-|-----------|--------|
-| SQL Server | mariadb |
-| SQL User | glpi |
-| SQL Password | glpipass123 |
-| Database | glpi |
 
 ---
 
@@ -140,104 +83,194 @@ vagrant ssh manager -c "docker service ls"
 
 ```
 ProjetDevops/
-├── README.md                      # Documentation (ce fichier)
-├── deploy.bat                     # Script déploiement Windows
-├── .gitignore                     # Fichiers ignorés par Git
+├── terraform/                  # Infrastructure as Code
+│   ├── main.tf                 # Orchestration Terraform
+│   └── Vagrantfile             # Définition des 3 VMs
 │
-├── terraform/                     # INFRASTRUCTURE (Terraform/Vagrant)
-│   ├── Vagrantfile                # Définition des 3 VMs
-│   └── stack/
-│       ├── docker-compose.yml     # Stack Docker Swarm
-│       └── nginx.conf             # Configuration Nginx reverse proxy
+├── ansible/                    # Configuration Management
+│   ├── ansible.cfg             # Configuration Ansible
+│   ├── inventory/
+│   │   └── hosts.ini           # Inventaire SSH
+│   ├── playbooks/
+│   │   └── site.yml            # Playbook principal
+│   ├── group_vars/
+│   │   └── all.yml             # Variables globales
+│   ├── files/                  # Fichiers à copier
+│   │   ├── docker-compose.yml
+│   │   └── nginx.conf
+│   └── roles/                  # Rôles Ansible
+│       ├── common/             # Paquets de base
+│       ├── docker/             # Installation Docker
+│       ├── swarm-manager/      # Initialisation Swarm
+│       ├── swarm-worker/       # Jonction au Swarm
+│       └── deploy-stack/       # Déploiement GLPI
 │
-└── ansible/                       # CONFIGURATION (Ansible)
-    ├── ansible.cfg                # Configuration Ansible
-    ├── inventory/
-    │   └── hosts.ini              # Inventaire des serveurs
-    ├── group_vars/
-    │   └── all.yml                # Variables globales
-    ├── playbooks/
-    │   └── site.yml               # Playbook principal
-    └── roles/
-        ├── common/                # Configuration de base
-        ├── docker/                # Installation Docker
-        ├── swarm-manager/         # Init Swarm Manager
-        ├── swarm-worker/          # Join Swarm Workers
-        └── deploy-stack/          # Déploiement stack GLPI
+├── deploy.bat                  # Script de déploiement Windows
+└── README.md                   # Documentation
 ```
 
 ---
 
-## Description des fichiers
+## Déploiement automatique
 
-### terraform/Vagrantfile
-Crée 3 machines virtuelles Ubuntu avec VirtualBox :
-- Installe Docker sur chaque nœud
-- Configure le cluster Swarm (1 manager + 2 workers)
+### Méthode 1 : Script de déploiement (recommandé)
 
-### terraform/stack/docker-compose.yml
-Définit la stack Docker Swarm :
-- Service MariaDB avec volume persistant
-- Service GLPI connecté à MariaDB
-- Service Nginx avec 3 replicas et SSL
+```cmd
+deploy.bat
+```
 
-### terraform/stack/nginx.conf
-Configuration Nginx :
-- Reverse proxy vers GLPI
-- Terminaison SSL/TLS
+Ce script effectue automatiquement :
+1. **Terraform** → Crée les 3 VMs via Vagrant
+2. **Ansible (via WSL)** → Configure Docker et Docker Swarm
+3. **Ansible** → Déploie la stack GLPI
 
-### ansible/roles/
-Rôles Ansible équivalents aux scripts shell :
-- `docker/` : Installation et configuration Docker
-- `swarm-manager/` : Initialisation du Swarm
-- `swarm-worker/` : Jonction des workers au Swarm
-- `deploy-stack/` : Déploiement de la stack GLPI
-
----
-
-## Destruction de l'infrastructure
+### Méthode 2 : Commandes manuelles
 
 ```powershell
+# Étape 1 : Provisionnement de l'infrastructure
 cd terraform
-vagrant destroy -f
+terraform init
+terraform apply -auto-approve
+
+# Étape 2 : Configuration avec Ansible (via WSL)
+wsl -d Ubuntu -e bash -c "
+  cd /mnt/c/Users/$env:USERNAME/OneDrive/Desktop/ProjetDevops/ansible
+  ANSIBLE_CONFIG=$(pwd)/ansible.cfg ansible-playbook playbooks/site.yml
+"
 ```
 
 ---
 
-## Let's Encrypt (Production)
+## Accès aux services
 
-En environnement de production avec un vrai nom de domaine :
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| GLPI | https://192.168.56.10 | glpi / glpi |
+| Nginx (status) | http://192.168.56.10 | - |
 
-1. Remplacer les certificats auto-signés par Let's Encrypt
-2. Utiliser l'environnement **staging** pour les tests :
-   ```
-   https://acme-staging-v02.api.letsencrypt.org/directory
-   ```
-3. ⚠️ **Limite** : 5 échecs = blocage 48h
-
----
-
-## Notes techniques
-
-1. **Persistence MariaDB** : Volume Docker sur le manager uniquement
-2. **Réseau overlay** : Communication inter-conteneurs via réseau Docker overlay
-3. **Load balancing** : Mesh routing Docker Swarm distribue le trafic entre les 3 Nginx
-4. **SSL/TLS** : Certificats auto-signés pour environnement local
+> ⚠️ Le certificat SSL est auto-signé, le navigateur affichera un avertissement.
 
 ---
 
 ## Commandes utiles
 
-```bash
+```powershell
+# Vérifier l'état des VMs
+cd terraform
+vagrant status
+
+# Se connecter au manager
+vagrant ssh manager
+
+# Voir les services Docker Swarm
+vagrant ssh manager -c "docker service ls"
+
+# Voir les nœuds du cluster
+vagrant ssh manager -c "docker node ls"
+
 # Logs d'un service
-docker service logs glpi_nginx
+vagrant ssh manager -c "docker service logs glpi_nginx"
 
-# Mise à l'échelle Nginx
-docker service scale glpi_nginx=5
-
-# Mise à jour d'un service
-docker service update --image nginx:latest glpi_nginx
-
-# Inspection d'un service
-docker service inspect glpi_glpi
+# Détruire l'infrastructure
+cd terraform
+terraform destroy -auto-approve
 ```
+
+---
+
+## Rôles Ansible
+
+### common
+- Mise à jour des paquets apt
+- Installation des outils de base (curl, vim, net-tools)
+- Configuration du timezone
+
+### docker
+- Installation de Docker et Docker Compose
+- Démarrage et activation du service Docker
+- Ajout de l'utilisateur vagrant au groupe docker
+
+### swarm-manager
+- Initialisation du cluster Docker Swarm
+- Génération du token de jonction worker
+
+### swarm-worker
+- Récupération du token depuis le manager
+- Jonction au cluster Swarm
+
+### deploy-stack
+- Copie des fichiers de configuration
+- Génération du certificat SSL auto-signé
+- Déploiement de la stack Docker
+
+---
+
+## Fichiers de configuration
+
+### docker-compose.yml
+
+Définit les 3 services :
+- **nginx** : Reverse proxy avec 3 réplicas
+- **glpi** : Application GLPI
+- **mariadb** : Base de données
+
+### nginx.conf
+
+Configuration du reverse proxy :
+- Écoute sur les ports 80 et 443
+- Redirection HTTP → HTTPS
+- Proxy vers GLPI sur le port 80
+
+---
+
+## Dépannage
+
+### Les VMs ne démarrent pas
+```powershell
+# Vérifier VirtualBox
+VBoxManage list vms
+
+# Nettoyer et recréer
+cd terraform
+vagrant destroy -f
+terraform apply -auto-approve
+```
+
+### Ansible ne se connecte pas
+```powershell
+# Tester la connexion SSH depuis WSL
+wsl -d Ubuntu -e bash -c "
+  ssh -i ~/.vagrant.d/insecure_private_key vagrant@192.168.56.10 hostname
+"
+```
+
+### Les services ne démarrent pas
+```powershell
+# Vérifier les logs
+vagrant ssh manager -c "docker service ps glpi_nginx --no-trunc"
+vagrant ssh manager -c "docker service logs glpi_glpi"
+```
+
+---
+
+## Technologies utilisées
+
+| Catégorie | Technologie | Version |
+|-----------|-------------|---------|
+| IaC | Terraform | 1.14+ |
+| Provisioning | Vagrant | 2.4+ |
+| Virtualisation | VirtualBox | 7.2+ |
+| Config Management | Ansible | 2.20+ |
+| Container Runtime | Docker | 28.2+ |
+| Orchestration | Docker Swarm | native |
+| Reverse Proxy | Nginx | alpine |
+| Application | GLPI | latest |
+| Database | MariaDB | 10.6 |
+
+---
+
+## Auteur
+
+**Anis HAMMOUDI** - Projet DevOps
+
+Rendu à : dlamy4@myges.fr

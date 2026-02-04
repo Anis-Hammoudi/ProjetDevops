@@ -1,39 +1,43 @@
 @echo off
-cd /d "%~dp0terraform"
 echo ==========================================
-echo    GLPI Stack Automated Deployment
+echo    GLPI Stack - Deploiement Automatique
+echo ==========================================
+echo.
+echo Outils utilises:
+echo   - Terraform : Orchestration infrastructure
+echo   - Vagrant   : Creation des VMs VirtualBox
+echo   - Ansible   : Configuration (via WSL)
 echo ==========================================
 echo.
 
-echo [1/4] Destroying existing VMs...
+cd /d "%~dp0terraform"
+
+echo [1/4] Destruction des anciennes VMs...
 vagrant destroy -f 2>nul
 
 echo.
-echo [2/4] Creating VMs and configuring Docker Swarm...
-vagrant up
+echo [2/4] Initialisation Terraform...
+terraform init -upgrade
 
 echo.
-echo [3/4] Waiting for swarm cluster to stabilize...
-timeout /t 10 /nobreak > nul
-vagrant ssh manager -c "docker node ls"
+echo [3/4] Creation des VMs (Terraform + Vagrant)...
+terraform apply -auto-approve
 
 echo.
-echo [4/4] Deploying GLPI Stack on manager...
-vagrant ssh manager -c "sudo mkdir -p /opt/glpi && sudo cp /vagrant/stack/nginx.conf /opt/glpi/ && sudo cp /vagrant/stack/docker-compose.yml /opt/glpi/ && sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /opt/glpi/privkey.pem -out /opt/glpi/fullchain.pem -subj '/CN=glpi.local' 2>/dev/null && sudo docker stack deploy -c /opt/glpi/docker-compose.yml glpi"
-
-echo.
-echo Waiting for services to start...
-timeout /t 20 /nobreak > nul
+echo [4/4] Configuration via Ansible (WSL)...
+wsl -d Ubuntu -e bash -c "cd /mnt/c/Users/%USERNAME%/OneDrive/Desktop/ProjetDevops/ansible && chmod +x deploy.sh && ./deploy.sh"
 
 echo.
 echo ==========================================
-echo    DEPLOYMENT COMPLETE
+echo    DEPLOIEMENT TERMINE
 echo ==========================================
 echo.
-echo Services:
-vagrant ssh manager -c "docker service ls"
+echo Access GLPI: https://192.168.56.10
+echo Login: glpi / glpi
 echo.
-echo Access GLPI at: https://192.168.56.10
-echo Default credentials: glpi / glpi
-echo.
+echo Database setup:
+echo   Host: mariadb
+echo   User: glpi
+echo   Pass: glpipass123
+echo ==========================================
 pause

@@ -1,24 +1,20 @@
 ---
-# Join worker nodes to the Swarm cluster
+# =============================================================================
+# ROLE: swarm-worker - Jonction au Swarm
+# =============================================================================
 
 - name: Check if node is already in Swarm
-  command: docker info --format '{{ "{{" }}.Swarm.LocalNodeState{{ "}}" }}'
+  shell: docker info --format {% raw %}'{{.Swarm.LocalNodeState}}'{% endraw %}
   register: swarm_status
   changed_when: false
 
 - name: Get worker join token from manager
+  shell: docker swarm join-token worker -q
   delegate_to: "{{ groups['managers'][0] }}"
-  command: docker swarm join-token worker -q
   register: worker_token
   changed_when: false
   when: swarm_status.stdout != "active"
 
 - name: Join Swarm as worker
-  command: docker swarm join --token {{ worker_token.stdout }} {{ swarm_manager_ip }}:2377
+  shell: docker swarm join --token {{ worker_token.stdout }} {{ manager_ip }}:2377
   when: swarm_status.stdout != "active"
-
-- name: Label worker node
-  delegate_to: "{{ groups['managers'][0] }}"
-  command: docker node update --label-add node.role=worker {{ inventory_hostname }}
-  ignore_errors: yes
-  changed_when: false
