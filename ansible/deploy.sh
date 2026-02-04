@@ -26,8 +26,15 @@ fi
 if [ ! -f ~/.vagrant.d/insecure_private_key ]; then
     echo "Copie de la clé SSH Vagrant..."
     mkdir -p ~/.vagrant.d
-    cp /mnt/c/Users/$USER/.vagrant.d/insecure_private_key ~/.vagrant.d/
-    chmod 600 ~/.vagrant.d/insecure_private_key
+    # Trouver la clé Vagrant (différents chemins possibles)
+    VAGRANT_KEY=$(find /mnt/c/Users -name "insecure_private_key" -path "*/.vagrant.d/*" 2>/dev/null | head -1)
+    if [ -n "$VAGRANT_KEY" ]; then
+        cp "$VAGRANT_KEY" ~/.vagrant.d/
+        chmod 600 ~/.vagrant.d/insecure_private_key
+    else
+        echo "ERREUR: Clé Vagrant non trouvée"
+        exit 1
+    fi
 fi
 
 cd "$ANSIBLE_DIR"
@@ -47,7 +54,7 @@ echo "   CONFIGURATION TERMINÉE"
 echo "=========================================="
 echo ""
 echo "Vérification des services..."
-ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg" ansible managers -m shell -a "docker service ls"
+ANSIBLE_CONFIG="$ANSIBLE_DIR/ansible.cfg" ansible managers -m shell -a "sudo docker service ls" --become
 echo ""
 echo "Accès GLPI: https://192.168.56.10"
 echo "Login: glpi / glpi"

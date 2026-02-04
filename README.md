@@ -49,9 +49,9 @@ Déployer automatiquement une infrastructure Docker Swarm avec :
 
 | Service | Image | Replicas | Port | Description |
 |---------|-------|----------|------|-------------|
-| nginx | nginx:alpine | 3 | 80, 443 | Reverse proxy avec SSL/TLS |
-| glpi | diouxx/glpi:latest | 1 | 8080 | Application GLPI |
-| mariadb | mariadb:10.6 | 1 | 3306 | Base de données |
+| nginx | quay.io/nginx/nginx-unprivileged:alpine | 3 | 80, 443 | Reverse proxy avec SSL/TLS |
+| glpi | ghcr.io/glpi-project/glpi:latest | 1 | 80 | Application GLPI |
+| mariadb | ghcr.io/linuxserver/mariadb:10.6.12 | 1 | 3306 | Base de données |
 
 ---
 

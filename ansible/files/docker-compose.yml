@@ -2,9 +2,11 @@ version: '3.8'
 
 services:
   mariadb:
-    image: mariadb:10.6
+    image: ghcr.io/linuxserver/mariadb:10.6.12
     environment:
       MYSQL_ROOT_PASSWORD: rootpass123
+      PUID: 1000
+      PGID: 1000
       MYSQL_DATABASE: glpi
       MYSQL_USER: glpi
       MYSQL_PASSWORD: glpipass123
@@ -19,12 +21,13 @@ services:
           - node.role == manager
 
   glpi:
-    image: diouxx/glpi:latest
+    image: ghcr.io/glpi-project/glpi:latest
     environment:
       MARIADB_HOST: mariadb
       MARIADB_DATABASE: glpi
       MARIADB_USER: glpi
       MARIADB_PASSWORD: glpipass123
+      MARIADB_ROOT_PASSWORD: rootpass123
     networks:
       - glpi_net
     deploy:
@@ -34,7 +37,8 @@ services:
           - node.role == manager
 
   nginx:
-    image: nginx:alpine
+    image: quay.io/nginx/nginx-unprivileged:alpine
+    user: "0:0"
     ports:
       - "80:80"
       - "443:443"
@@ -46,6 +50,9 @@ services:
       - glpi_net
     deploy:
       replicas: 3
+      placement:
+        constraints:
+          - node.role == manager
 
 networks:
   glpi_net:

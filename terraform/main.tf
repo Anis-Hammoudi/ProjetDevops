@@ -64,6 +64,30 @@ resource "null_resource" "vagrant_up" {
 }
 
 # -----------------------------------------------------------------------------
+# Configuration avec Ansible (via WSL)
+# -----------------------------------------------------------------------------
+
+resource "null_resource" "ansible_config" {
+  depends_on = [null_resource.vagrant_up]
+
+  # Attendre que les VMs soient prêtes
+  provisioner "local-exec" {
+    command = "powershell -Command \"Start-Sleep -Seconds 30\""
+  }
+
+  # Exécuter Ansible via WSL en utilisant le script deploy.sh
+  provisioner "local-exec" {
+    command     = "wsl -d Ubuntu -e bash ../ansible/deploy.sh"
+    working_dir = path.module
+  }
+
+  triggers = {
+    vagrant = null_resource.vagrant_up.id
+    playbook = filemd5("${path.module}/../ansible/playbooks/site.yml")
+  }
+}
+
+# -----------------------------------------------------------------------------
 # Outputs
 # -----------------------------------------------------------------------------
 
