@@ -13,6 +13,16 @@
     group: root
     mode: '0644'
 
+- name: Force apt to use IPv4 (avoid IPv6 stalls)
+  copy:
+    dest: /etc/apt/apt.conf.d/99force-ipv4
+    content: |
+      Acquire::ForceIPv4 "true";
+      Acquire::ForceIPv6 "false";
+    owner: root
+    group: root
+    mode: '0644'
+
 - name: Update apt cache
   apt:
     update_cache: yes
