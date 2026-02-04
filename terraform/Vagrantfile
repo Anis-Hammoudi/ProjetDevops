@@ -1,10 +1,15 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+# 
+# Infrastructure provisionnée par Terraform (via Vagrant)
+# Configuration gérée par Ansible
+#
 
 MANAGER_IP = "192.168.56.10"
 WORKER1_IP = "192.168.56.11"  
 WORKER2_IP = "192.168.56.12"
 
+# Script d'installation Docker (équivalent du role ansible/roles/docker)
 $install_docker = <<-SCRIPT
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -14,11 +19,13 @@ systemctl start docker
 usermod -aG docker vagrant
 SCRIPT
 
+# Script init Swarm Manager (équivalent du role ansible/roles/swarm-manager)
 $init_swarm = <<-SCRIPT
 docker swarm init --advertise-addr 192.168.56.10
 docker swarm join-token worker -q > /vagrant/worker_token
 SCRIPT
 
+# Script join Swarm Worker (équivalent du role ansible/roles/swarm-worker)
 $join_swarm = <<-SCRIPT
 for i in 1 2 3 4 5; do
   if [ -f /vagrant/worker_token ]; then
@@ -38,24 +45,27 @@ Vagrant.configure("2") do |config|
     vb.linked_clone = true
   end
 
+  # Manager Node - Docker Swarm Leader
   config.vm.define "manager" do |m|
     m.vm.hostname = "manager"
     m.vm.network "private_network", ip: MANAGER_IP
-    m.vm.provision "shell", inline: $install_docker
-    m.vm.provision "shell", inline: $init_swarm
+    m.vm.provision "shell", inline: $install_docker, name: "docker"
+    m.vm.provision "shell", inline: $init_swarm, name: "swarm-init"
   end
 
+  # Worker Node 1
   config.vm.define "worker1" do |w|
     w.vm.hostname = "worker1"
     w.vm.network "private_network", ip: WORKER1_IP
-    w.vm.provision "shell", inline: $install_docker
-    w.vm.provision "shell", inline: $join_swarm
+    w.vm.provision "shell", inline: $install_docker, name: "docker"
+    w.vm.provision "shell", inline: $join_swarm, name: "swarm-join"
   end
 
+  # Worker Node 2
   config.vm.define "worker2" do |w|
     w.vm.hostname = "worker2"
     w.vm.network "private_network", ip: WORKER2_IP
-    w.vm.provision "shell", inline: $install_docker
-    w.vm.provision "shell", inline: $join_swarm
+    w.vm.provision "shell", inline: $install_docker, name: "docker"
+    w.vm.provision "shell", inline: $join_swarm, name: "swarm-join"
   end
 end
