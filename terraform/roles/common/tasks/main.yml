@@ -1,0 +1,60 @@
+---
+# Common tasks for all nodes
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - python3
+      - python3-pip
+      - python3-setuptools
+      - software-properties-common
+      - net-tools
+      - htop
+      - vim
+    state: present
+
+- name: Install Python Docker SDK
+  pip:
+    name:
+      - docker
+      - docker-compose
+      - jsondiff
+      - pyyaml
+    executable: pip3
+    state: present
+
+- name: Set timezone
+  timezone:
+    name: Europe/Paris
+
+- name: Configure sysctl for Docker
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+  ignore_errors: yes
+
+- name: Disable swap
+  command: swapoff -a
+  changed_when: false
+
+- name: Remove swap from fstab
+  lineinfile:
+    path: /etc/fstab
+    regexp: '.*swap.*'
+    state: absent

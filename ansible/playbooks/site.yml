@@ -1,0 +1,27 @@
+---
+# Main playbook for deploying GLPI stack on Docker Swarm
+
+- name: Configure all nodes
+  hosts: swarm
+  become: true
+  roles:
+    - common
+    - docker
+
+- name: Initialize Swarm Manager
+  hosts: managers
+  become: true
+  roles:
+    - swarm-manager
+
+- name: Join Swarm Workers
+  hosts: workers
+  become: true
+  roles:
+    - swarm-worker
+
+- name: Deploy application stack
+  hosts: managers
+  become: true
+  roles:
+    - deploy-stack

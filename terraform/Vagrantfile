@@ -1,0 +1,61 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+MANAGER_IP = "192.168.56.10"
+WORKER1_IP = "192.168.56.11"  
+WORKER2_IP = "192.168.56.12"
+
+$install_docker = <<-SCRIPT
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq docker.io docker-compose > /dev/null 2>&1
+systemctl enable docker
+systemctl start docker
+usermod -aG docker vagrant
+SCRIPT
+
+$init_swarm = <<-SCRIPT
+docker swarm init --advertise-addr 192.168.56.10
+docker swarm join-token worker -q > /vagrant/worker_token
+SCRIPT
+
+$join_swarm = <<-SCRIPT
+for i in 1 2 3 4 5; do
+  if [ -f /vagrant/worker_token ]; then
+    docker swarm join --token $(cat /vagrant/worker_token) 192.168.56.10:2377 && break
+  fi
+  sleep 3
+done
+SCRIPT
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_check_update = false
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = 1024
+    vb.cpus = 1
+    vb.linked_clone = true
+  end
+
+  config.vm.define "manager" do |m|
+    m.vm.hostname = "manager"
+    m.vm.network "private_network", ip: MANAGER_IP
+    m.vm.provision "shell", inline: $install_docker
+    m.vm.provision "shell", inline: $init_swarm
+  end
+
+  config.vm.define "worker1" do |w|
+    w.vm.hostname = "worker1"
+    w.vm.network "private_network", ip: WORKER1_IP
+    w.vm.provision "shell", inline: $install_docker
+    w.vm.provision "shell", inline: $join_swarm
+  end
+
+  config.vm.define "worker2" do |w|
+    w.vm.hostname = "worker2"
+    w.vm.network "private_network", ip: WORKER2_IP
+    w.vm.provision "shell", inline: $install_docker
+    w.vm.provision "shell", inline: $join_swarm
+  end
+end
