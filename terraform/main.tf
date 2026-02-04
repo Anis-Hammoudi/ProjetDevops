@@ -1,8 +1,21 @@
 # =============================================================================
 # TERRAFORM - Provisionnement Infrastructure
 # =============================================================================
-# Ce fichier Terraform orchestre la création des VMs via Vagrant
-# La configuration des VMs est ensuite gérée par Ansible
+# 
+# ARCHITECTURE:
+#   Terraform orchestre l'ensemble du déploiement :
+#   1. null_resource.vagrant_up   → Crée les 3 VMs via Vagrant/VirtualBox
+#   2. null_resource.ansible_config → Configure Docker Swarm via Ansible (WSL)
+#
+# JUSTIFICATION:
+#   - Terraform gère l'état de l'infrastructure et les dépendances
+#   - Vagrant est utilisé pour sa maturité avec VirtualBox
+#   - Ansible configure les serveurs de manière idempotente
+#
+# ALTERNATIVE CONSIDÉRÉE:
+#   Le provider Terraform VirtualBox existe mais n'est pas officiel et 
+#   peu maintenu. Vagrant offre une meilleure stabilité pour les VMs locales.
+#
 # =============================================================================
 
 terraform {

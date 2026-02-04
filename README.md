@@ -37,21 +37,23 @@ Déployer automatiquement une infrastructure Docker Swarm avec :
 │    MANAGER    │              │   WORKER 1    │              │   WORKER 2    │
 │ 192.168.56.10 │              │ 192.168.56.11 │              │ 192.168.56.12 │
 ├───────────────┤              ├───────────────┤              ├───────────────┤
-│  • MariaDB    │              │  • Nginx      │              │  • Nginx      │
-│  • GLPI       │              │    (replica)  │              │    (replica)  │
-│  • Nginx      │              │               │              │               │
+│  • MariaDB    │◄─Volume──────│               │              │               │
+│    (persist)  │  mariadb_data│  Docker       │              │  Docker       │
+│  • GLPI       │              │  Engine       │              │  Engine       │
+│  • Nginx x3   │              │               │              │               │
 └───────────────┘              └───────────────┘              └───────────────┘
-
-            Réseau overlay : glpi_glpi_net (Docker Swarm)
+        │                                │                                │
+        └────────────────────────────────┴────────────────────────────────┘
+                          Réseau overlay : glpi_glpi_net
 ```
 
 ### Services déployés
 
-| Service | Image | Replicas | Port | Description |
-|---------|-------|----------|------|-------------|
-| nginx | quay.io/nginx/nginx-unprivileged:alpine | 3 | 80, 443 | Reverse proxy avec SSL/TLS |
-| glpi | ghcr.io/glpi-project/glpi:latest | 1 | 80 | Application GLPI |
-| mariadb | ghcr.io/linuxserver/mariadb:10.6.12 | 1 | 3306 | Base de données |
+| Service | Image | Replicas | Placement | Persistance |
+|---------|-------|----------|-----------|-------------|
+| nginx | quay.io/nginx/nginx-unprivileged:alpine | 3 | manager | Configs bind-mount |
+| glpi | ghcr.io/glpi-project/glpi:latest | 1 | manager | - |
+| mariadb | ghcr.io/linuxserver/mariadb:10.6.12 | 1 | manager | **Volume: mariadb_data** |
 
 ---
 
@@ -89,6 +91,7 @@ ProjetDevops/
 │
 ├── ansible/                    # Configuration Management
 │   ├── ansible.cfg             # Configuration Ansible
+│   ├── deploy.sh               # Script d'exécution WSL
 │   ├── inventory/
 │   │   └── hosts.ini           # Inventaire SSH
 │   ├── playbooks/
@@ -105,38 +108,81 @@ ProjetDevops/
 │       ├── swarm-worker/       # Jonction au Swarm
 │       └── deploy-stack/       # Déploiement GLPI
 │
-├── deploy.bat                  # Script de déploiement Windows
 └── README.md                   # Documentation
 ```
 
 ---
 
-## Déploiement automatique
+## Choix Architecturaux
 
-### Méthode 1 : Script de déploiement (recommandé)
+### Terraform + Vagrant (Justification)
 
-```cmd
-deploy.bat
+**Pourquoi Terraform orchestre Vagrant ?**
+
+| Approche | Avantages | Inconvénients |
+|----------|-----------|---------------|
+| Terraform direct (VirtualBox provider) | Natif | Provider non officiel, peu maintenu |
+| Vagrant seul | Simple | Pas d'état, pas de dépendances |
+| **Terraform + Vagrant** | État Terraform, Vagrantfile standard | Couche supplémentaire |
+
+**Notre choix** : Terraform orchestre l'infrastructure (variables, état, dépendances) et délègue la création des VMs à Vagrant (mature, bien documenté). Terraform gère ensuite l'exécution d'Ansible automatiquement via `null_resource`.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    terraform apply                               │
+├─────────────────────────────────────────────────────────────────┤
+│  1. null_resource.vagrant_up    →  vagrant up (3 VMs)           │
+│  2. null_resource.ansible_config →  ansible-playbook (via WSL)  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-Ce script effectue automatiquement :
-1. **Terraform** → Crée les 3 VMs via Vagrant
-2. **Ansible (via WSL)** → Configure Docker et Docker Swarm
-3. **Ansible** → Déploie la stack GLPI
+### Persistance MariaDB
 
-### Méthode 2 : Commandes manuelles
+La base de données utilise :
+- **Volume nommé Docker** : `mariadb_data:/var/lib/mysql` (persistant)
+- **Contrainte de placement** : `node.role == manager` (reste sur le même nœud)
+
+Cela garantit que les données survivent aux redémarrages de conteneurs.
+
+### Certificats SSL (Let's Encrypt)
+
+**Pourquoi certificats auto-signés ?**
+
+Let's Encrypt nécessite :
+- Un nom de domaine public (pas d'IP privée)
+- Port 80/443 accessible depuis Internet
+- Validation HTTP-01 ou DNS-01
+
+En environnement VirtualBox local, ces conditions sont impossibles. Les certificats auto-signés sont l'alternative standard pour le développement.
+
+---
+
+## Déploiement automatique
+
+### Commande unique (recommandé)
+
+```powershell
+cd terraform
+terraform init
+terraform apply -auto-approve
+```
+
+Cette commande effectue **automatiquement** :
+1. **Terraform** → Crée les 3 VMs via Vagrant
+2. **Terraform** → Attend 30 secondes que les VMs soient prêtes
+3. **Ansible (via WSL)** → Configure Docker et Docker Swarm
+4. **Ansible** → Déploie la stack GLPI
+
+### Déploiement manuel (si besoin)
 
 ```powershell
 # Étape 1 : Provisionnement de l'infrastructure
 cd terraform
 terraform init
-terraform apply -auto-approve
+vagrant up
 
 # Étape 2 : Configuration avec Ansible (via WSL)
-wsl -d Ubuntu -e bash -c "
-  cd /mnt/c/Users/$env:USERNAME/OneDrive/Desktop/ProjetDevops/ansible
-  ANSIBLE_CONFIG=$(pwd)/ansible.cfg ansible-playbook playbooks/site.yml
-"
+wsl -d Ubuntu -e bash ../ansible/deploy.sh
 ```
 
 ---
