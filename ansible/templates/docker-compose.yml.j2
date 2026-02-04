@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: ghcr.io/linuxserver/mariadb:10.6.12
+    environment:
+      MYSQL_ROOT_PASSWORD: {{ mariadb_root_password }}
+      PUID: 1000
+      PGID: 1000
+      MYSQL_DATABASE: {{ mariadb_database }}
+      MYSQL_USER: {{ mariadb_user }}
+      MYSQL_PASSWORD: {{ mariadb_password }}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - glpi_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  glpi:
+    image: ghcr.io/glpi-project/glpi:{{ glpi_version }}
+    environment:
+      MARIADB_HOST: mariadb
+      MARIADB_DATABASE: {{ mariadb_database }}
+      MARIADB_USER: {{ mariadb_user }}
+      MARIADB_PASSWORD: {{ mariadb_password }}
+      MARIADB_ROOT_PASSWORD: {{ mariadb_root_password }}
+    networks:
+      - glpi_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  nginx:
+    image: quay.io/nginx/nginx-unprivileged:alpine
+    user: "0:0"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/glpi/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /opt/glpi/ssl:/etc/nginx/ssl:ro
+      - /opt/glpi/certbot:/var/www/certbot:ro
+    networks:
+      - glpi_net
+    deploy:
+      replicas: 3
+      placement:
+        constraints:
+          - node.role == manager
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    volumes:
+      - /opt/glpi/letsencrypt:/etc/letsencrypt
+      - /opt/glpi/certbot:/var/www/certbot
+      - /opt/glpi/ssl:/opt/ssl
+    environment:
+      LE_DOMAIN: {{ domain_name }}
+      LE_EMAIL: {{ letsencrypt_email }}
+      LE_STAGING: "{{ '--staging' if letsencrypt_staging else '' }}"
+    entrypoint: /bin/sh -c
+    command: >
+      "set -e;
+       while :; do
+         certbot certonly --webroot -w /var/www/certbot
+           --agree-tos --no-eff-email --non-interactive
+           --email ${LE_EMAIL} -d ${LE_DOMAIN} ${LE_STAGING} --keep-until-expiring
+         && cp /etc/letsencrypt/live/${LE_DOMAIN}/fullchain.pem /opt/ssl/fullchain.pem
+         && cp /etc/letsencrypt/live/${LE_DOMAIN}/privkey.pem /opt/ssl/privkey.pem
+         || true;
+         sleep 12h;
+       done"
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+networks:
+  glpi_net:
+    driver: overlay
+
+volumes:
+  mariadb_data:

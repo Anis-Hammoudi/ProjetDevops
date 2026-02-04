@@ -2,7 +2,7 @@
 
 ## Participants
 
-| Nom | Prénom |
+| Nom | Prenom |
 |-----|--------|
 | HAMMOUDI | Anis |
 
@@ -10,56 +10,40 @@
 
 ## Objectif du projet
 
-Déployer automatiquement une infrastructure Docker Swarm avec :
-- **3 Nginx** en reverse proxy (Docker Swarm avec réplication)
-- **Certificats SSL** auto-signés (environnement local)
+Deployer automatiquement une infrastructure Docker Swarm avec :
+- **3 Nginx** en reverse proxy (replication Swarm)
+- **Let's Encrypt** pour les certificats SSL (avec certificat de bootstrap en local)
 - **GLPI** comme serveur web de gestion IT
-- **MariaDB** comme base de données
+- **MariaDB** comme base de donnees GLPI
 
-**Outils utilisés :**
+**Outils utilises :**
 - **Terraform** : Orchestration du provisionnement via Vagrant
-- **Vagrant/VirtualBox** : Création des VMs (3 nœuds)
+- **Vagrant/VirtualBox** : Creation des VMs (3 noeuds)
 - **Ansible** : Configuration des serveurs via SSH depuis WSL
 
 ---
 
 ## Architecture
 
-```
-                    ┌─────────────────────────────────────────────┐
-                    │            Docker Swarm Cluster             │
-                    └─────────────────────────────────────────────┘
-                                         │
-        ┌────────────────────────────────┼────────────────────────────────┐
-        │                                │                                │
-        ▼                                ▼                                ▼
-┌───────────────┐              ┌───────────────┐              ┌───────────────┐
-│    MANAGER    │              │   WORKER 1    │              │   WORKER 2    │
-│ 192.168.56.10 │              │ 192.168.56.11 │              │ 192.168.56.12 │
-├───────────────┤              ├───────────────┤              ├───────────────┤
-│  • MariaDB    │◄─Volume──────│               │              │               │
-│    (persist)  │  mariadb_data│  Docker       │              │  Docker       │
-│  • GLPI       │              │  Engine       │              │  Engine       │
-│  • Nginx x3   │              │               │              │               │
-└───────────────┘              └───────────────┘              └───────────────┘
-        │                                │                                │
-        └────────────────────────────────┴────────────────────────────────┘
-                          Réseau overlay : glpi_glpi_net
-```
+- **Manager** : `192.168.56.10`
+- **Worker 1** : `192.168.56.11`
+- **Worker 2** : `192.168.56.12`
+- **Reseau overlay** : `glpi_net`
 
-### Services déployés
+### Services deployes
 
 | Service | Image | Replicas | Placement | Persistance |
 |---------|-------|----------|-----------|-------------|
-| nginx | quay.io/nginx/nginx-unprivileged:alpine | 3 | manager | Configs bind-mount |
+| nginx | quay.io/nginx/nginx-unprivileged:alpine | 3 | manager | Bind-mount `/opt/glpi` |
+| certbot | certbot/certbot:v2.11.0 | 1 | manager | Bind-mount `/opt/glpi` |
 | glpi | ghcr.io/glpi-project/glpi:latest | 1 | manager | - |
 | mariadb | ghcr.io/linuxserver/mariadb:10.6.12 | 1 | manager | **Volume: mariadb_data** |
 
 ---
 
-## Prérequis
+## Prerequis
 
-| Logiciel | Version | Téléchargement |
+| Logiciel | Version | Telechargement |
 |----------|---------|----------------|
 | VirtualBox | >= 7.0 | https://www.virtualbox.org/wiki/Downloads |
 | Vagrant | >= 2.4 | https://www.vagrantup.com/downloads |
@@ -85,81 +69,55 @@ choco install vagrant virtualbox terraform -y
 
 ```
 ProjetDevops/
-├── terraform/                  # Infrastructure as Code
-│   ├── main.tf                 # Orchestration Terraform
-│   └── Vagrantfile             # Définition des 3 VMs
-│
-├── ansible/                    # Configuration Management
-│   ├── ansible.cfg             # Configuration Ansible
-│   ├── deploy.sh               # Script d'exécution WSL
-│   ├── inventory/
-│   │   └── hosts.ini           # Inventaire SSH
-│   ├── playbooks/
-│   │   └── site.yml            # Playbook principal
-│   ├── group_vars/
-│   │   └── all.yml             # Variables globales
-│   ├── files/                  # Fichiers à copier
-│   │   ├── docker-compose.yml
-│   │   └── nginx.conf
-│   └── roles/                  # Rôles Ansible
-│       ├── common/             # Paquets de base
-│       ├── docker/             # Installation Docker
-│       ├── swarm-manager/      # Initialisation Swarm
-│       ├── swarm-worker/       # Jonction au Swarm
-│       └── deploy-stack/       # Déploiement GLPI
-│
-└── README.md                   # Documentation
+|-- terraform/                  # Infrastructure as Code
+|   |-- main.tf                 # Orchestration Terraform
+|   `-- Vagrantfile             # Definition des 3 VMs
+|-- ansible/                    # Configuration Management
+|   |-- ansible.cfg             # Configuration Ansible
+|   |-- deploy.sh               # Script d'execution WSL
+|   |-- inventory/
+|   |   `-- hosts.ini           # Inventaire SSH
+|   |-- playbooks/
+|   |   `-- site.yml            # Playbook principal
+|   |-- group_vars/
+|   |   `-- all.yml             # Variables globales
+|   |-- templates/              # Templates Ansible
+|   |   |-- docker-compose.yml.j2
+|   |   `-- nginx.conf.j2
+|   `-- roles/                  # Roles Ansible
+|       |-- common/             # Paquets de base
+|       |-- docker/             # Installation Docker
+|       |-- swarm-manager/      # Initialisation Swarm
+|       |-- swarm-worker/       # Jonction au Swarm
+|       `-- deploy-stack/       # Deploiement GLPI
+`-- README.md                   # Documentation
 ```
 
 ---
 
-## Choix Architecturaux
+## Configuration Let's Encrypt
 
-### Terraform + Vagrant (Justification)
+Modifiez `ansible/group_vars/all.yml` :
+- `domain_name` : votre nom de domaine public
+- `letsencrypt_email` : email de contact
+- `letsencrypt_staging` : `true` pour tester, `false` pour un vrai certificat
 
-**Pourquoi Terraform orchestre Vagrant ?**
+Let's Encrypt necessite :
+- Un nom de domaine public resolvable vers votre IP
+- Les ports **80/443** exposes depuis Internet
 
-| Approche | Avantages | Inconvénients |
-|----------|-----------|---------------|
-| Terraform direct (VirtualBox provider) | Natif | Provider non officiel, peu maintenu |
-| Vagrant seul | Simple | Pas d'état, pas de dépendances |
-| **Terraform + Vagrant** | État Terraform, Vagrantfile standard | Couche supplémentaire |
+En local (VirtualBox), un **certificat auto-signe de bootstrap** est genere pour demarrer Nginx.
+Apres delivrance du certificat, rechargez Nginx :
 
-**Notre choix** : Terraform orchestre l'infrastructure (variables, état, dépendances) et délègue la création des VMs à Vagrant (mature, bien documenté). Terraform gère ensuite l'exécution d'Ansible automatiquement via `null_resource`.
-
+```powershell
+vagrant ssh manager -c "docker service update --force glpi_nginx"
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    terraform apply                               │
-├─────────────────────────────────────────────────────────────────┤
-│  1. null_resource.vagrant_up    →  vagrant up (3 VMs)           │
-│  2. null_resource.ansible_config →  ansible-playbook (via WSL)  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Persistance MariaDB
-
-La base de données utilise :
-- **Volume nommé Docker** : `mariadb_data:/var/lib/mysql` (persistant)
-- **Contrainte de placement** : `node.role == manager` (reste sur le même nœud)
-
-Cela garantit que les données survivent aux redémarrages de conteneurs.
-
-### Certificats SSL (Let's Encrypt)
-
-**Pourquoi certificats auto-signés ?**
-
-Let's Encrypt nécessite :
-- Un nom de domaine public (pas d'IP privée)
-- Port 80/443 accessible depuis Internet
-- Validation HTTP-01 ou DNS-01
-
-En environnement VirtualBox local, ces conditions sont impossibles. Les certificats auto-signés sont l'alternative standard pour le développement.
 
 ---
 
-## Déploiement automatique
+## Deploiement automatique
 
-### Commande unique (recommandé)
+### Commande unique (recommande)
 
 ```powershell
 cd terraform
@@ -167,41 +125,42 @@ terraform init
 terraform apply -auto-approve
 ```
 
-Cette commande effectue **automatiquement** :
-1. **Terraform** → Crée les 3 VMs via Vagrant
-2. **Terraform** → Attend 30 secondes que les VMs soient prêtes
-3. **Ansible (via WSL)** → Configure Docker et Docker Swarm
-4. **Ansible** → Déploie la stack GLPI
+Cette commande effectue automatiquement :
+1. **Terraform** -> Cree les 3 VMs via Vagrant
+2. **Terraform** -> Attend 30 secondes que les VMs soient pretes
+3. **Ansible (via WSL)** -> Configure Docker et Docker Swarm
+4. **Ansible** -> Deploie la stack GLPI
 
-### Déploiement manuel (si besoin)
+### Deploiement manuel (si besoin)
 
 ```powershell
-# Étape 1 : Provisionnement de l'infrastructure
+# Etape 1 : Provisionnement de l'infrastructure
 cd terraform
 terraform init
 vagrant up
 
-# Étape 2 : Configuration avec Ansible (via WSL)
+# Etape 2 : Configuration avec Ansible (via WSL)
 wsl -d Ubuntu -e bash ../ansible/deploy.sh
 ```
 
 ---
 
-## Accès aux services
+## Acces aux services
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | GLPI | https://192.168.56.10 | glpi / glpi |
+| GLPI (domain) | https://<domain_name> | glpi / glpi |
 | Nginx (status) | http://192.168.56.10 | - |
 
-> ⚠️ Le certificat SSL est auto-signé, le navigateur affichera un avertissement.
+> Attention : en local, le certificat est auto-signe tant que Let's Encrypt n'a pas delivre le certificat.
 
 ---
 
 ## Commandes utiles
 
 ```powershell
-# Vérifier l'état des VMs
+# Verifier l'etat des VMs
 cd terraform
 vagrant status
 
@@ -211,78 +170,88 @@ vagrant ssh manager
 # Voir les services Docker Swarm
 vagrant ssh manager -c "docker service ls"
 
-# Voir les nœuds du cluster
+# Voir les noeuds du cluster
 vagrant ssh manager -c "docker node ls"
 
 # Logs d'un service
 vagrant ssh manager -c "docker service logs glpi_nginx"
 
-# Détruire l'infrastructure
+# Detruire l'infrastructure
 cd terraform
 terraform destroy -auto-approve
 ```
 
 ---
 
-## Rôles Ansible
+## Roles Ansible
 
 ### common
-- Mise à jour des paquets apt
-- Installation des outils de base (curl, vim, net-tools)
-- Configuration du timezone
+- Mise a jour des paquets apt
+- Installation des outils de base
+- Configuration du DNS pour eviter les timeouts
 
 ### docker
 - Installation de Docker et Docker Compose
-- Démarrage et activation du service Docker
+- Demarrage et activation du service Docker
 - Ajout de l'utilisateur vagrant au groupe docker
 
 ### swarm-manager
 - Initialisation du cluster Docker Swarm
-- Génération du token de jonction worker
+- Generation du token de jonction worker
 
 ### swarm-worker
-- Récupération du token depuis le manager
+- Recuperation du token depuis le manager
 - Jonction au cluster Swarm
 
 ### deploy-stack
-- Copie des fichiers de configuration
-- Génération du certificat SSL auto-signé
-- Déploiement de la stack Docker
+- Rendu des templates de configuration
+- Certificat SSL de bootstrap
+- Deploiement de la stack Docker
 
 ---
 
 ## Fichiers de configuration
 
-### docker-compose.yml
+### docker-compose.yml.j2
 
-Définit les 3 services :
-- **nginx** : Reverse proxy avec 3 réplicas
+Definit les services :
+- **nginx** : Reverse proxy avec 3 replicas
+- **certbot** : Let's Encrypt (renouvellement automatique)
 - **glpi** : Application GLPI
-- **mariadb** : Base de données
+- **mariadb** : Base de donnees
 
-### nginx.conf
+### nginx.conf.j2
 
 Configuration du reverse proxy :
-- Écoute sur les ports 80 et 443
-- Redirection HTTP → HTTPS
+- Ecoute sur les ports 80 et 443
+- Redirection HTTP -> HTTPS
+- Endpoint ACME pour Let's Encrypt
 - Proxy vers GLPI sur le port 80
 
 ---
 
-## Dépannage
+## Depannage
 
-### Les VMs ne démarrent pas
+### Les VMs ne demarrent pas
+
 ```powershell
-# Vérifier VirtualBox
+# Verifier VirtualBox
 VBoxManage list vms
 
-# Nettoyer et recréer
+# Nettoyer et recreer
 cd terraform
 vagrant destroy -f
 terraform apply -auto-approve
 ```
 
+### Apt est tres lent ou echoue
+
+- Verifiez que le DNS fonctionne dans les VMs
+- Le Vagrantfile active le DNS proxy de VirtualBox
+- Si besoin : `vagrant reload --provision`
+
 ### Ansible ne se connecte pas
+
 ```powershell
 # Tester la connexion SSH depuis WSL
 wsl -d Ubuntu -e bash -c "
@@ -290,18 +259,25 @@ wsl -d Ubuntu -e bash -c "
 "
 ```
 
-### Les services ne démarrent pas
+### Les services ne demarrent pas
+
 ```powershell
-# Vérifier les logs
+# Verifier les logs
 vagrant ssh manager -c "docker service ps glpi_nginx --no-trunc"
 vagrant ssh manager -c "docker service logs glpi_glpi"
 ```
 
 ---
 
-## Technologies utilisées
+## Note sur les scripts
 
-| Catégorie | Technologie | Version |
+Les scripts utilises sont fournis dans ce depot et restent visibles et tracables.
+
+---
+
+## Technologies utilisees
+
+| Categorie | Technologie | Version |
 |-----------|-------------|---------|
 | IaC | Terraform | 1.14+ |
 | Provisioning | Vagrant | 2.4+ |
@@ -319,4 +295,4 @@ vagrant ssh manager -c "docker service logs glpi_glpi"
 
 **Anis HAMMOUDI** - Projet DevOps
 
-Rendu à : dlamy4@myges.fr
+Rendu a : dlamy4@myges.fr

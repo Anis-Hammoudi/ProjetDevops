@@ -14,4 +14,9 @@ mariadb_password: glpipass123
 
 # GLPI
 glpi_version: latest
+
+# Let's Encrypt
+# Use a real public domain for production certificates.
 domain_name: glpi.local
+letsencrypt_email: admin@example.com
+letsencrypt_staging: true

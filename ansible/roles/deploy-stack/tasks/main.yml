@@ -3,33 +3,39 @@
 # ROLE: deploy-stack - Deploiement de la stack GLPI
 # =============================================================================
 
-- name: Create stack directory
+- name: Create stack base directory
   file:
     path: /opt/glpi
     state: directory
     mode: '0755'
 
-- name: Copy docker-compose file
-  copy:
-    src: "{{ playbook_dir }}/../files/docker-compose.yml"
+- name: Create stack subdirectories
+  file:
+    path: "/opt/glpi/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - certbot
+    - letsencrypt
+    - ssl
+
+- name: Render docker-compose file
+  template:
+    src: "{{ playbook_dir }}/../templates/docker-compose.yml.j2"
     dest: /opt/glpi/docker-compose.yml
     mode: '0644'
 
-- name: Copy nginx config
-  copy:
-    src: "{{ playbook_dir }}/../files/nginx.conf"
+- name: Render nginx config
+  template:
+    src: "{{ playbook_dir }}/../templates/nginx.conf.j2"
     dest: /opt/glpi/nginx.conf
     mode: '0644'
 
-- name: Generate self-signed SSL certificate
+- name: Generate bootstrap self-signed SSL certificate
   shell: |
-    openssl req -x509 -nodes -days 365 \
-      -newkey rsa:2048 \
-      -keyout /opt/glpi/privkey.pem \
-      -out /opt/glpi/fullchain.pem \
-      -subj '/CN=glpi.local'
+    openssl req -x509 -nodes -days 2       -newkey rsa:2048       -keyout /opt/glpi/ssl/privkey.pem       -out /opt/glpi/ssl/fullchain.pem       -subj "/CN={{ domain_name }}"
   args:
-    creates: /opt/glpi/fullchain.pem
+    creates: /opt/glpi/ssl/fullchain.pem
 
 - name: Deploy GLPI stack
   shell: docker stack deploy -c /opt/glpi/docker-compose.yml glpi

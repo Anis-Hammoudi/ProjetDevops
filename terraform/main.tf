@@ -85,7 +85,9 @@ resource "null_resource" "ansible_config" {
 
   # Attendre que les VMs soient prêtes
   provisioner "local-exec" {
-    command = "powershell -Command \"Start-Sleep -Seconds 30\""
+    command = <<-EOT
+      powershell -Command "$hosts = @('${var.manager_ip}','${var.worker1_ip}','${var.worker2_ip}'); foreach ($h in $hosts) { $ok = $false; for ($i = 0; $i -lt 60 -and -not $ok; $i++) { $t = Test-NetConnection -ComputerName $h -Port 22 -WarningAction SilentlyContinue; if ($t.TcpTestSucceeded) { $ok = $true } else { Start-Sleep -Seconds 5 } } if (-not $ok) { throw 'SSH not ready on ' + $h } }"
+    EOT
   }
 
   # Exécuter Ansible via WSL en utilisant le script deploy.sh
@@ -95,8 +97,14 @@ resource "null_resource" "ansible_config" {
   }
 
   triggers = {
-    vagrant = null_resource.vagrant_up.id
+    vagrant  = null_resource.vagrant_up.id
     playbook = filemd5("${path.module}/../ansible/playbooks/site.yml")
+    templates = join(",", [
+      filemd5("${path.module}/../ansible/templates/docker-compose.yml.j2"),
+      filemd5("${path.module}/../ansible/templates/nginx.conf.j2"),
+      filemd5("${path.module}/../ansible/group_vars/all.yml"),
+      filemd5("${path.module}/../ansible/roles/deploy-stack/tasks/main.yml")
+    ])
   }
 }
 
