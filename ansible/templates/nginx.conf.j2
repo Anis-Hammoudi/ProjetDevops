@@ -3,9 +3,9 @@ events {
 }
 
 http {
-    upstream glpi {
-        server glpi:80;
-    }
+    # Use Docker internal DNS resolver for dynamic resolution
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    resolver_timeout 5s;
 
     server {
         listen 80;
@@ -32,7 +32,9 @@ http {
         }
 
         location / {
-            proxy_pass http://glpi;
+            # Dynamic upstream resolution - allows nginx to start even if glpi is not ready
+            set $glpi_upstream glpi;
+            proxy_pass http://$glpi_upstream:80;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
