@@ -1,7 +1,5 @@
 ---
-# =============================================================================
-# ROLE: deploy-stack - Deploiement de la stack GLPI
-# =============================================================================
+# Role: deploy-stack - Deploiement de la stack GLPI
 
 - name: Create stack base directory
   file:

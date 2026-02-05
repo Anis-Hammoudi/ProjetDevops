@@ -1,9 +1,6 @@
 ---
-# =============================================================================
-# PLAYBOOK PRINCIPAL - Deploiement GLPI sur Docker Swarm
-# =============================================================================
-# Execute via WSL : ansible-playbook playbooks/site.yml
-# =============================================================================
+# Playbook principal - Deploiement GLPI sur Docker Swarm
+# Projet DevOps - HAMMOUDI Anis, CHEDAD Mehdi, ZOUINE Sanaa
 
 - name: Configuration commune et installation Docker
   hosts: swarm

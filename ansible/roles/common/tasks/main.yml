@@ -1,7 +1,5 @@
 ---
-# =============================================================================
-# ROLE: common - Configuration de base
-# =============================================================================
+# Role: common - Configuration de base des serveurs
 
 - name: Ensure DNS resolvers are set (avoid apt timeouts)
   copy:

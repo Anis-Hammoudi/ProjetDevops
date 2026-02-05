@@ -1,7 +1,5 @@
 ---
-# =============================================================================
-# ROLE: swarm-worker - Jonction au Swarm
-# =============================================================================
+# Role: swarm-worker - Jonction au Swarm
 
 - name: Check if node is already in Swarm
   shell: docker info --format {% raw %}'{{.Swarm.LocalNodeState}}'{% endraw %}

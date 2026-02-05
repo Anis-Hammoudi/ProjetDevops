@@ -1,7 +1,5 @@
 ---
-# =============================================================================
-# ROLE: swarm-manager - Initialisation du Swarm
-# =============================================================================
+# Role: swarm-manager - Initialisation du Swarm
 
 - name: Check if Swarm is already initialized
   shell: docker info --format {% raw %}'{{.Swarm.LocalNodeState}}'{% endraw %}

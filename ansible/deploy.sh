@@ -1,10 +1,6 @@
 #!/bin/bash
-# =============================================================================
-# SCRIPT DE DÉPLOIEMENT - Ansible depuis WSL
-# =============================================================================
-# Ce script configure les VMs créées par Vagrant/Terraform
-# Exécuter depuis WSL : ./deploy.sh
-# =============================================================================
+# Script de deploiement Ansible (execute depuis WSL)
+# Projet DevOps - HAMMOUDI Anis, CHEDAD Mehdi, ZOUINE Sanaa
 
 set -e
 

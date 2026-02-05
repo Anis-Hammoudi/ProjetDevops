@@ -1,18 +1,5 @@
-# =============================================================================
-# TERRAFORM - Provisionnement Infrastructure
-# =============================================================================
-# 
-# ARCHITECTURE:
-#   Terraform orchestre l'ensemble du déploiement :
-#   1. null_resource.vagrant_up   → Crée les 3 VMs via Vagrant/VirtualBox
-#   2. null_resource.ansible_config → Configure Docker Swarm via Ansible (WSL)
-#
-# JUSTIFICATION:
-#   - Terraform gère l'état de l'infrastructure et les dépendances
-#   - Vagrant est utilisé pour sa maturité avec VirtualBox
-#   - Ansible configure les serveurs de manière idempotente
-#
-# =============================================================================
+# Terraform - Provisionnement Infrastructure Docker Swarm
+# Projet DevOps - HAMMOUDI Anis, CHEDAD Mehdi, ZOUINE Sanaa
 
 terraform {
   required_version = ">= 1.0.0"
@@ -25,9 +12,7 @@ terraform {
   }
 }
 
-# -----------------------------------------------------------------------------
 # Variables
-# -----------------------------------------------------------------------------
 
 variable "manager_ip" {
   description = "IP du manager Swarm"
@@ -47,9 +32,7 @@ variable "worker2_ip" {
   default     = "192.168.56.12"
 }
 
-# -----------------------------------------------------------------------------
 # Provisionnement des VMs avec Vagrant
-# -----------------------------------------------------------------------------
 
 resource "null_resource" "vagrant_up" {
   
@@ -72,9 +55,7 @@ resource "null_resource" "vagrant_up" {
   }
 }
 
-# -----------------------------------------------------------------------------
 # Configuration avec Ansible (via WSL)
-# -----------------------------------------------------------------------------
 
 resource "null_resource" "ansible_config" {
   depends_on = [null_resource.vagrant_up]
@@ -96,9 +77,7 @@ resource "null_resource" "ansible_config" {
   }
 }
 
-# -----------------------------------------------------------------------------
 # Outputs
-# -----------------------------------------------------------------------------
 
 output "manager_ip" {
   description = "IP du manager Swarm"

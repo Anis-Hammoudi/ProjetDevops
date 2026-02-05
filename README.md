@@ -2,9 +2,14 @@
 
 ## Participants
 
-| Nom | Prenom |
+| Nom | Prénom |
 |-----|--------|
 | HAMMOUDI | Anis |
+| CHEDAD | Mehdi |
+| ZOUINE | Sanaa |
+
+**Date de rendu :** 16/02/2026  
+**Contact :** dlamy4@myges.fr
 
 ---
 
@@ -291,8 +296,12 @@ Les scripts utilises sont fournis dans ce depot et restent visibles et tracables
 
 ---
 
-## Auteur
+## Auteurs
 
-**Anis HAMMOUDI** - Projet DevOps
+| Nom | Prénom | Rôle |
+|-----|--------|------|
+| HAMMOUDI | Anis | Infrastructure Terraform/Vagrant |
+| CHEDAD | Mehdi | Configuration Ansible |
+| ZOUINE | Sanaa | Stack Docker/GLPI |
 
-Rendu a : dlamy4@myges.fr
+**Rendu à :** dlamy4@myges.fr

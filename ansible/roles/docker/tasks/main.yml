@@ -1,7 +1,5 @@
 ---
-# =============================================================================
-# ROLE: docker - Installation de Docker
-# =============================================================================
+# Role: docker - Installation de Docker
 
 - name: Update apt cache
   apt:
